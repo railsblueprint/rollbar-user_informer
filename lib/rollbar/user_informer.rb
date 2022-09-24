@@ -9,6 +9,8 @@ module Rollbar
 
     class << self
       attr_accessor :user_information
+      attr_accessor :user_information_full
+      attr_accessor :user_information_show_full
       attr_accessor :user_information_placeholder
     end
 
@@ -19,9 +21,10 @@ module Rollbar
 
       def call(env)
         status, headers, body = @app.call(env)
-        if (replacement = Rollbar::UserInformer.user_information) && (error_uuid = env[REQUEST_ENV_KEY])
-          replacement = replacement.gsub(/\{\{\s*error_uuid\s*\}\}/, error_uuid)
-          body = replace_placeholder(replacement, body, headers)
+
+        if (error_uuid = env[REQUEST_ENV_KEY]) && ( replacement_text = replacement(env))
+          replacement_text = replacement_text.gsub(/\{\{\s*error_uuid\s*\}\}/, error_uuid)
+          body = replace_placeholder(replacement_text, body, headers)
           headers["Error-Id"] = error_uuid
         end
         [status, headers, body]
@@ -29,12 +32,20 @@ module Rollbar
 
       private
 
+      def replacement(env)
+        if Rollbar::UserInformer.user_information_show_full && Rollbar::UserInformer.user_information_show_full.call(env)
+          Rollbar::UserInformer.user_information_full || Rollbar::UserInformer.user_information
+        else
+          Rollbar::UserInformer.user_information
+        end
+      end
+
       # - body interface is .each so we cannot use anything else
       # - always call .close on the old body so it can get garbage collected if it is a File
-      def replace_placeholder(replacement, body, headers)
+      def replace_placeholder(replacement_text, body, headers)
         new_body = []
         body.each do |chunk|
-          new_body << chunk.gsub(Rollbar::UserInformer.user_information_placeholder || DEFAULT_PLACEHOLDER, replacement)
+          new_body << chunk.gsub(Rollbar::UserInformer.user_information_placeholder || DEFAULT_PLACEHOLDER, replacement_text)
         end
         headers["Content-Length"] = new_body.inject(0) { |sum, x| sum + x.bytesize }.to_s
         new_body
