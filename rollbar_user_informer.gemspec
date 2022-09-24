@@ -12,5 +12,5 @@ Gem::Specification.new name, Rollbar::UserInformer::VERSION do |s|
   s.license = "MIT"
   s.required_ruby_version = ">= 2.3.0"
 
-  s.add_runtime_dependency 'rollbar', '~> 2.15'
+  s.add_runtime_dependency 'rollbar', '> 2.15'
 end
